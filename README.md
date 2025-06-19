@@ -74,7 +74,7 @@ if (($TargetCidr -like "{{*}}") -or
 **Condition 2:** Type **equal to** Workstation  
 **Action name:** Get Target Subnet  
 
-![Get-Target-Subnet.png](img/Get-Target-Subnet.png)
+![Get-Target-Subnet-1.png](img/Get-Target-Subnet-1.png)
 
 **Action 2**  
 **Type:** Run script  
@@ -86,7 +86,7 @@ if (($TargetCidr -like "{{*}}") -or
 | MacAddress      | MacAddress          |
 | TargetCidr      | TargetCidr          |
 
-**Conditions:** Action status "Get Target Subnet" **equal to** success
+**Condition 1:** Action status "Get Target Subnet" **equal to** success
 
 ![Get-MAC-Address.png](img/Get-MAC-Address-Script.png)
 
@@ -94,7 +94,7 @@ if (($TargetCidr -like "{{*}}") -or
 **Type:** Set custom field  
 **Custom field:** MAC Address  
 **Variable:** MacAddress  
-**Conditions:** Action status "Get MAC Address" **equal to** success  
+**Condition 1:** Action status "Get MAC Address" **equal to** success  
 
 ![Set-MAC-Address-Custom-Field.png](img/Set-MAC-Address-Custom-Field.png)
 
@@ -140,7 +140,7 @@ Parameter mappings:
 | MacAddress    | MacAddress           |
 | TargetCidr    | TargetCidr           |
 
-**Conditions:** Platform **equal to** Windows  
+**Condition 1:** Platform **equal to** Windows  
 **Variables:**  
 
 | Name       | Default value |
@@ -169,10 +169,10 @@ if (($TargetCidr -like "{{*}}") -or
     {{TargetCidr=$TargetCidr}}
 }
 ```
-**Conditions:** Platform **equal to** Windows  
+**Condition 1:** Platform **equal to** Windows  
 **Action name:** Get Target Subnet  
 
-![Get-Target-Subnet.png](img/Get-Target-Subnet.png)
+![Get-Target-Subnet-2.png](img/Get-Target-Subnet-2.png)
 
 **Action 2**  
 **Type:** Run script  
@@ -184,7 +184,7 @@ if (($TargetCidr -like "{{*}}") -or
 | MacAddress      | MacAddress          |
 | TargetCidr      | TargetCidr          |
 
-**Conditions:** Action status "Get Target Subnet" **equal to** success  
+**Condition 1:** Action status "Get Target Subnet" **equal to** success  
 
 ![Invoke-Wake-On-LAN-Script.png](img/Invoke-Wake-On-LAN-Script.png)
 
