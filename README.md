@@ -85,6 +85,7 @@ if (($TargetCidr -like "{{*}}") -or
 | --------------- | ------------------- |
 | MacAddress      | MacAddress          |
 | TargetCidr      | TargetCidr          |
+
 **Conditions:** Action status "Get Target Subnet" **equal to** success
 
 ![Get-MAC-Address.png](img/Get-MAC-Address-Script.png)
@@ -138,6 +139,7 @@ Parameter mappings:
 | ------------- | -------------------- |
 | MacAddress    | MacAddress           |
 | TargetCidr    | TargetCidr           |
+
 **Conditions:** Platform **equal to** Windows  
 **Variables:**  
 
@@ -146,8 +148,8 @@ Parameter mappings:
 | MacAddress | (none)        |
 | TargetCidr | (none)        |
 
-> [!NOTE] Important
-> Make note of the webhook trigger URL and authorization token, as we'll need those for the next step.
+> [!NOTE]
+> IMPORTANT: Make note of the webhook trigger URL and authorization token, as we'll need those for the next step.
 
 ![Webhook-URL-Token](img/Webhook-URL-Token.png)
 
@@ -181,6 +183,7 @@ if (($TargetCidr -like "{{*}}") -or
 | --------------- | ------------------- |
 | MacAddress      | MacAddress          |
 | TargetCidr      | TargetCidr          |
+
 **Conditions:** Action status "Get Target Subnet" **equal to** success  
 
 ![Invoke-Wake-On-LAN-Script.png](img/Invoke-Wake-On-LAN-Script.png)
@@ -212,6 +215,7 @@ Finally, we'll create the automation will be manually triggered on devices which
 | Header        | Value                                |
 | ------------- | ------------------------------------ |
 | Authorization | (paste the authorization token here) |
+
 **Action name:** Wake-On-LAN Webhook Trigger  
 
 ![HTTP-Request.png](img/HTTP-Request.png)
