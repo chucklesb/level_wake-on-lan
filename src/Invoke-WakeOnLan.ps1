@@ -64,19 +64,32 @@ function Convert-IpToUInt32 {
     )
 
     try {
-        $Octets = $IpAddressString.Split('.') | ForEach-Object { [System.Convert]::ToByte($_) }
+        # Split IP address into octets and validate
+        $Octets = $IpAddressString.Split('.')
         if ($Octets.Count -ne 4) {
             throw "Invalid IPv4 address format: $IpAddressString"
         }
-        # Big-endian: (octet1 << 24) + (octet2 << 16) + (octet3 << 8) + octet4
-        $IpUInt32 = ([uint32]$Octets[0] -shl 24) + `
-                    ([uint32]$Octets[1] -shl 16) + `
-                    ([uint32]$Octets[2] -shl 8) + `
-                    ([uint32]$Octets[3])
+
+        [int]$parsed = 0
+        [int[]]$OctetsInt = @()
+
+        foreach ($Octet in $Octets) {
+            if (-not [int]::TryParse($Octet, [ref]$parsed) -or
+                $parsed -lt 0 -or $parsed -gt 255) {
+                throw "Invalid IP address octet `'$($Octet)`' in `'$($IpAddressString)`'."
+            }
+            $OctetsInt += $parsed
+        }
+
+        # Convert IP to integer representation
+        $IpUInt32 = ([uint32]$OctetsInt[0] -shl 24) -bor
+                    ([uint32]$OctetsInt[1] -shl 16) -bor
+                    ([uint32]$OctetsInt[2] -shl 8)  -bor
+                    ([uint32]$OctetsInt[3])
         return $IpUInt32
     }
     catch {
-        Resolve-Error "Failed to convert IP string '$IpAddressString' to UInt32: $($_.Exception.Message)"
+        Resolve-Error "Convert-IpToUInt32: $($_.Exception.Message)"
     }
 }
 
@@ -87,40 +100,68 @@ function Get-BroadcastAddress {
     )
 
     try {
+        # Validate and split CIDR string
         $CidrParts = $CidrString.Split('/')
         if ($CidrParts.Count -ne 2) {
-            throw "Invalid CIDR format: $CidrString"
+            throw "Invalid CIDR format for `'$($CidrString)`' (valid format A.B.C.D/M)"
         }
 
-        $NetworkAddressString = $CidrParts[0]
-        $PrefixLength = [int]$CidrParts[1]
+        $Network = $CidrParts[0]
+        $Mask = [int]$CidrParts[1]
 
-        if ($PrefixLength -lt 0 -or $PrefixLength -gt 32) {
-            throw "Invalid CIDR prefix length (must be 0-32): $PrefixLength"
-        }
-
-        $NetworkUInt32 = Convert-IpToUInt32 -IpAddressString $NetworkAddressString
+        # Convert IP to integer
+        $NetworkUInt32 = Convert-IpToUInt32 -IpAddressString $Network
         if ($null -eq $NetworkUInt32) {
             throw "Network address conversion failed"
         }
 
-        # Create subnet mask
-        $MaskUInt32 = if ($PrefixLength -eq 0) {
+        # Validate and calculate netmask
+        if ($Mask -lt 0 -or $Mask -gt 32) {
+            throw "Invalid CIDR mask `'$($Mask)`' (valid range 0..32)."
+        }
+        $MaskUInt32 = if ($Mask -eq 0) {
             [uint32]0
         } else {
-            ([uint32]::MaxValue) -shl (32 - $PrefixLength)
+            ([uint32]::MaxValue) -shl (32 - $Mask)
         }
 
-        # Calculate broadcast: network address OR inverted subnet mask
+        # Calculate broadcast address
         $BroadcastUInt32 = $NetworkUInt32 -bor (-bnot $MaskUInt32)
 
-        # Convert to dotted-decimal notation
+        # Convert back to dotted-decimal
         $BroadcastIp = [IPAddress]($BroadcastUInt32).ToString()
         return $BroadcastIp
     }
     catch {
-        Resolve-Error "Failed to calculate broadcast address for '$CidrString': $($_.Exception.Message)"
+        Resolve-Error "Get-BroadcastAddress: $($_.Exception.Message)"
     }
+}
+
+function Get-NormalizedMac {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$InputMac
+    )
+
+    try {
+        # Remove delimiters and convert to uppercase
+        $CleanMac = ($InputMac -replace '[^a-zA-Z0-9]').ToUpper()
+
+        # Validate input MAC
+        if ($CleanMac -notmatch '^[0-9A-F]{12}$') {
+            throw "Invalid MAC address: $InputMac"
+        }
+
+        # Convert to byte array
+        $ByteArray = @()
+        for ($i = 0; $i -lt 12; $i += 2) {
+            $ByteArray += [Convert]::ToByte($CleanMac.Substring($i, 2), 16)
+        }
+    } catch {
+        Resolve-Error "Get-NormalizedMac: $($_.Exception.Message)"
+    }
+
+    return $ByteArray
 }
 
 function Invoke-WakeOnLan {
@@ -133,23 +174,18 @@ function Invoke-WakeOnLan {
         [string]$TargetCidr
     )
 
-    # Validate MAC address and convert to bytes
-    $MacPattern = "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
-    if ($MacAddress -notmatch $MacPattern) {
-        Resolve-Error "Invalid MAC address format. Acceptable formats are 00:11:22:AA:BB:CC or 00-11-22-AA-BB-CC."
-    }
-    $MacBytes = $MacAddress -split '[-:]' | ForEach-Object { [Convert]::ToByte($_, 16) }
+    # Convert MAC address to byte array and normalized string
+    $MacBytes = Get-NormalizedMac -InputMac $MacAddress
+    $MacString = ($MacBytes | ForEach-Object { $_.ToString("x2") }) -join ':'
+    Write-LogMessage "Target MAC: $MacString"
 
-    # Validate target subnet CIDR and get broadcast address
-    $CidrPattern = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(3[0-2]|[1-2][0-9]|[0-9])$"
-    if ($TargetCidr -notmatch $CidrPattern) {
-        Resolve-Error "Invalid target subnet."
-    }
+    # Calculate subnet broadcast address
     $BroadcastAddress = (Get-BroadcastAddress -CidrString $TargetCidr).IPAddressToString
+    Write-LogMessage "Broadcast address: $BroadcastAddress"
 
-    # Construct header and packet
-    $Header = [byte[]](255, 255, 255, 255, 255, 255)
-    $Packet = $Header + ($MacBytes * 16)
+    # Construct Wake-On-LAN magic packet
+    $Packet = [byte[]](0xFF) * 6
+    $Packet += ($MacBytes * 16)
 
     # Open UDP socket and send Wake-On-LAN magic packet
     try {
@@ -157,13 +193,22 @@ function Invoke-WakeOnLan {
         $UdpClient.EnableBroadcast = $true
         $UdpClient.Connect($BroadcastAddress, 9)
         $BytesSent = $UdpClient.Send($Packet, $Packet.Length)
-        Write-LogMessage "Wake-On-LAN packet sent to $MacAddress ($BytesSent bytes)." -Type Success
+
+        if ($BytesSent -eq 102) {
+            # Simulate socat -v output
+            Write-Output "> $(Get-Date -Format "yyyy/MM/dd HH:mm:ss.fffffff")  length=$($BytesSent) from=0 to=$($BytesSent - 1)"
+            [System.BitConverter]::ToString($Packet).Replace('-',' ').ToLower()
+            Write-LogMessage "Wake-On-LAN packet sent to $($MacString)." -Type Success
+        } else {
+            throw "Invalid packet size ($BytesSent bytes)."
+        }
     } catch {
-        Resolve-Error "Failed to send Wake-On-Lan packet: $_"
+        Resolve-Error "Invoke-WakeOnLan: Failed to send Wake-On-Lan packet: $_"
     } finally {
         $UdpClient.Close()
     }
 }
 
 ## Entry point
+Write-Host "Logging to file: $LogPath"
 Invoke-WakeOnLan -MacAddress $level_MacAddress -TargetCidr $level_TargetCidr

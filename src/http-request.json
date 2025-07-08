@@ -1,0 +1,7 @@
+{
+  "device_ids": [
+    "{{cf_wake-on-lan_device}}"
+  ],
+  "MacAddress": "{{cf_mac_address}}",
+  "TargetCidr": "{{cf_wake-on-lan_subnet}}"
+}
